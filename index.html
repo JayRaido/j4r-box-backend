@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NoSQL with Bootstrap</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+</head>
+
+<body class="bg-light">
+  <div class="container mt-5">
+    <h2 class="text-center mb-4">User Records</h2>
+
+    <!-- form area -->
+    <form id="userForm" class="card p-4 shadow">
+      <div class="mb-3">
+        <label for="name" class="form-label">Name:</label>
+        <input type="text" id="name" class="form-control" required />
+      </div>
+      <div class="mb-3">
+        <label for="email" class="form-label">Email:</label>
+        <input type="email" id="email" class="form-control" required />
+      </div>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+
+    <!-- table area to show saved users -->
+    <div class="mt-5">
+      <h4>Stored Records</h4>
+      <table class="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+          </tr>
+        </thead>
+        <tbody id="userTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // if you deploy the backend online later, change this link
+    const API_URL = "http://localhost:5000/api/users";
+
+    // when form is submitted
+    document.getElementById("userForm").addEventListener("submit", async (e) => {
+      e.preventDefault(); // stop the page from refreshing
+
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      if (!name || !email) return alert("Please fill up both fields!");
+
+      try {
+        // send data to backend
+        await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email }),
+        });
+
+        // clear the form and reload table
+        document.getElementById("userForm").reset();
+        await loadUsers();
+      } catch (err) {
+        console.error("There was an error saving:", err);
+        alert("Something went wrong while saving!");
+      }
+    });
+
+    // function to load users and display them
+    async function loadUsers() {
+      try {
+        const res = await fetch(API_URL);
+        const users = await res.json();
+        console.log("Loaded users:", users);
+
+        const table = document.getElementById("userTable");
+        table.innerHTML = "";
+
+        if (users.length === 0) {
+          table.innerHTML =
+            '<tr><td colspan="2" class="text-center text-muted">No records yet.</td></tr>';
+          return;
+        }
+
+        // add every user as a new row
+        users.forEach((u) => {
+          table.innerHTML += `<tr><td>${u.name}</td><td>${u.email}</td></tr>`;
+        });
+      } catch (err) {
+        console.error("Error loading users:", err);
+      }
+    }
+
+    // auto run when the page opens
+    loadUsers();
+  </script>
+</body>
+</html>
