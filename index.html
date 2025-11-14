@@ -1,103 +1,1074 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NoSQL with Bootstrap</title>
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>J4R Box | Dark Mode Game Store</title>
+  <meta name="description" content="J4R Box — Demo game store (dark gamer UI). Cart, login, admin tools, and animated tubes cursor background." />
+  <meta name="theme-color" content="#07111a" />
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    :root{
+      --bg:#05080b;
+      --panel:#0f1720;
+      --muted:#94a3b8;
+      --accent:#38b6ff;
+      --accent-2:#7c3aed;
+      --glass: rgba(255,255,255,0.03);
+    }
+
+    html,body { height:100%; margin:0; font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; background: linear-gradient(180deg,#02040a 0%, #07111a 60%); color: #e6eef6; }
+
+    /* -------------------------
+       Tubes canvas behind everything
+       ------------------------- */
+    #tubes-wrapper,
+    #canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -10;
+      pointer-events: none;
+    }
+
+    /* -------------------------
+       Card / neon UI
+       ------------------------- */
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.04);
+      backdrop-filter: blur(6px);
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .card:hover { transform: translateY(-6px); box-shadow: 0 12px 40px rgba(2,6,23,0.7); }
+
+    .neon { color: var(--accent); text-shadow: 0 2px 8px rgba(56,182,255,0.08); }
+    .btn-accent {
+      background: linear-gradient(90deg,var(--accent),var(--accent-2));
+      color: #04101a;
+      box-shadow: 0 8px 40px rgba(56,182,255,0.08);
+    }
+
+    .img-fallback { background: linear-gradient(135deg,#071026,#0b1930); display:grid; place-items:center; color:#9fb8d9; font-weight:600; }
+
+    .drawer { transition: transform 260ms cubic-bezier(.2,.9,.28,1); }
+    .drawer-closed { transform: translateX(110%); }
+    .drawer-open { transform: translateX(0%); }
+
+    .modal-pop { transform: translateY(10px); opacity: 0; transition: all 220ms ease; }
+    .modal-open { transform: translateY(0); opacity: 1; }
+
+    @keyframes toastIn { from { transform: translateY(12px); opacity:0 } to { transform: translateY(0); opacity:1 } }
+
+    .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
+    input, textarea, select { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); color: #e6eef6; outline:none; }
+    ::placeholder { color: rgba(230,238,246,0.32); }
+
+    /* responsive */
+    @media (max-width:640px){
+      header .logo-label { display:none; }
+    }
+  </style>
 </head>
+<body class="min-h-screen flex flex-col">
 
-<body class="bg-light">
-  <div class="container mt-5">
-    <h2 class="text-center mb-4">User Records</h2>
+  <!-- Tubes cursor canvas (background) -->
+  <div id="tubes-wrapper">
+    <canvas id="canvas" aria-hidden="true"></canvas>
+  </div>
 
-    <!-- form area -->
-    <form id="userForm" class="card p-4 shadow">
-      <div class="mb-3">
-        <label for="name" class="form-label">Name:</label>
-        <input type="text" id="name" class="form-control" required />
+  <!-- HEADER -->
+  <header class="sticky top-0 z-50 bg-transparent/0">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center gap-3">
+          <img src="./images/logo.png" alt="J4R Box logo" class="w-10 h-10 object-contain rounded-sm" />
+          <div class="logo-label">
+            <div class="text-lg font-bold neon">J4R Box</div>
+            <div class="text-xs text-slate-400 -mt-1">Game Store</div>
+          </div>
+          <span class="ml-3 px-2 py-0.5 text-xs rounded bg-white/4 text-slate-300 border border-white/6">Demo</span>
+        </div>
+
+        <nav class="hidden md:flex items-center gap-6 text-sm text-slate-300">
+          <a href="#shop" class="hover:text-white">Shop</a>
+          <a href="#about" class="hover:text-white">About</a>
+          <a href="#contact" class="hover:text-white">Contact</a>
+          <button id="openGuideBtn" class="hover:text-white">Setup</button>
+        </nav>
+
+        <div class="flex items-center gap-3">
+          <button id="btnSearch" class="p-2 rounded-md hover:bg-white/3" title="Search">
+            <svg class="w-5 h-5 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 21l-4.35-4.35" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+
+          <button id="btnAccount" class="p-2 rounded-md hover:bg-white/3 flex items-center gap-2">
+            <svg class="w-5 h-5 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15.75 6a3.75 3.75 0 1 1-7.5 0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="accountLabel" class="text-sm text-slate-200">Login</span>
+          </button>
+
+          <button id="btnCart" class="relative p-2 rounded-md hover:bg-white/3">
+            <svg class="w-6 h-6 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="cartCount" class="absolute -top-1 -right-1 bg-blue-400 text-black text-xs px-2 rounded-full">0</span>
+          </button>
+
+          <button id="btnMobileMenu" class="md:hidden p-2 rounded-md hover:bg-white/3">
+            <svg class="w-6 h-6 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
       </div>
-      <div class="mb-3">
-        <label for="email" class="form-label">Email:</label>
-        <input type="email" id="email" class="form-control" required />
-      </div>
-      <button type="submit" class="btn btn-primary">Save</button>
-    </form>
+    </div>
 
-    <!-- table area to show saved users -->
-    <div class="mt-5">
-      <h4>Stored Records</h4>
-      <table class="table table-bordered table-striped">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-          </tr>
-        </thead>
-        <tbody id="userTable"></tbody>
-      </table>
+    <!-- mobile nav -->
+    <div id="mobileNav" class="md:hidden hidden bg-[#05111a] border-t border-white/4">
+      <div class="px-4 py-3 flex flex-col gap-1">
+        <a href="#shop" class="py-2">Shop</a>
+        <a href="#about" class="py-2">About</a>
+        <a href="#contact" class="py-2">Contact</a>
+        <button id="openGuideBtnMobile" class="text-left py-2">Setup</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 pb-20 w-full">
+
+    <!-- HERO -->
+    <section id="home" class="mt-8 grid md:grid-cols-2 gap-8 items-center">
+      <div class="space-y-4">
+        <div class="text-slate-300">Welcome to</div>
+        <h1 class="text-4xl md:text-5xl font-extrabold neon">J4R Box</h1>
+        <p class="text-slate-400 max-w-xl">Premium games, reliable top-ups and gaming gear. Demo storefront with admin tools, cart, and login simulation. Currency: Philippine Peso (₱).</p>
+
+        <div class="flex items-center gap-3">
+          <a href="#shop" class="px-4 py-2 rounded btn-accent font-semibold shadow-sm">Browse Shop</a>
+          <button id="ctaLogin" class="px-4 py-2 border border-white/6 rounded text-slate-200 hover:bg-white/3">Login / Register</button>
+        </div>
+
+        <div class="mt-2 text-xs text-slate-500">Backend: <span id="backendUrlLabel" class="font-mono text-slate-300">local</span></div>
+      </div>
+
+      <div class="relative">
+        <div class="card p-4 rounded-lg glow-outline">
+          <div class="grid grid-cols-3 gap-3">
+            <div class="h-28 rounded img-fallback">Elden</div>
+            <div class="h-28 rounded img-fallback">GOW</div>
+            <div class="h-28 rounded img-fallback">Valorant</div>
+            <div class="h-28 rounded img-fallback">MC</div>
+            <div class="h-28 rounded img-fallback">Switch</div>
+            <div class="h-28 rounded img-fallback">Razer</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SHOP CONTROLS -->
+    <section id="shop" class="mt-12">
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+        <div>
+          <h2 class="text-2xl font-bold">Shop</h2>
+          <p class="text-slate-400">Browse, search, sort, and add items to your cart. Admins can add / edit / delete products.</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <input id="searchInput" placeholder="Search games, accessories..." class="px-3 py-2 rounded bg-transparent border border-white/5 w-64 text-slate-200" />
+          <select id="categoryFilter" class="px-3 py-2 rounded bg-transparent border border-white/5 text-slate-200">
+            <option value="all">All Categories</option>
+            <option value="virtual">Virtual Games</option>
+            <option value="physical">Physical Games</option>
+            <option value="currency">In-game Currency</option>
+            <option value="accessory">Accessories</option>
+          </select>
+          <select id="sortSelect" class="px-3 py-2 rounded bg-transparent border border-white/5 text-slate-200">
+            <option value="featured">Sort: Featured</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="name-asc">Name: A to Z</option>
+            <option value="name-desc">Name: Z to A</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Product grid -->
+      <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <!-- JS injected content -->
+      </div>
+
+      <!-- ADMIN TOOLS -->
+      <div id="adminPanel" class="mt-12 hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-xl font-semibold">Admin Tools (Product CRUD)</h3>
+          <span id="adminModeBadge" class="text-xs px-2 py-1 rounded bg-white/5 text-slate-300">Admin: OFF</span>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-6">
+          <form id="productForm" class="card p-4 rounded-lg">
+            <h4 class="font-medium mb-2">Create / Update Product</h4>
+            <input type="hidden" id="prodId" />
+            <div class="space-y-2">
+              <label class="text-xs text-slate-300">Name</label>
+              <input id="prodName" class="w-full px-3 py-2 rounded" placeholder="e.g., Elden Ring (PC)" />
+            </div>
+
+            <div class="space-y-2 mt-2">
+              <label class="text-xs text-slate-300">Category</label>
+              <select id="prodCategory" class="w-full px-3 py-2 rounded">
+                <option value="virtual">Virtual</option>
+                <option value="physical">Physical</option>
+                <option value="currency">In-game Currency</option>
+                <option value="accessory">Accessory</option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mt-3">
+              <div>
+                <label class="text-xs text-slate-300">Price (PHP)</label>
+                <input id="prodPrice" type="number" step="0.01" min="0" class="w-full px-3 py-2 rounded" />
+              </div>
+              <div>
+                <label class="text-xs text-slate-300">Stock</label>
+                <input id="prodStock" type="number" step="1" min="0" class="w-full px-3 py-2 rounded" />
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <label class="text-xs text-slate-300">Image URL / relative path</label>
+              <input id="prodImage" class="w-full px-3 py-2 rounded" placeholder="./images/elden.jpg" />
+            </div>
+
+            <div class="mt-3">
+              <label class="text-xs text-slate-300">Description</label>
+              <textarea id="prodDesc" rows="3" class="w-full px-3 py-2 rounded"></textarea>
+            </div>
+
+            <div class="mt-4 flex gap-3">
+              <button id="saveProductBtn" class="px-4 py-2 rounded btn-accent">Save Product</button>
+              <button id="resetProductBtn" type="button" class="px-4 py-2 rounded border">Reset</button>
+              <button id="seedMoreBtn" type="button" class="ml-auto px-3 py-2 rounded border text-xs text-slate-300">Seed +10</button>
+            </div>
+
+            <p class="text-xs text-slate-400 mt-2">If you have a remote API set in Settings, create/update/delete will call it. Otherwise actions persist locally.</p>
+          </form>
+
+          <div class="card p-4 rounded-lg">
+            <h4 class="font-medium mb-2">Product List (Edit / Delete)</h4>
+            <div id="adminProductList" class="divide-y divide-white/5 max-h-80 overflow-y-auto"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section id="about" class="mt-12">
+      <div class="card p-6 rounded-lg">
+        <h3 class="text-xl font-semibold">About J4R Box</h3>
+        <p class="text-slate-400 mt-2">J4R Box is a demo storefront to showcase a full-stack CRUD experience with a modern dark UI and animated background. Use it to present or prototype an e-commerce flow.</p>
+        <ul class="mt-3 list-disc ml-6 text-slate-400">
+          <li>Digital & Physical games</li>
+          <li>Top-ups and accessories</li>
+          <li>Admin tools for product management</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- CONTACT -->
+    <section id="contact" class="mt-12 grid lg:grid-cols-2 gap-6">
+      <div class="card p-4 rounded-lg">
+        <h3 class="font-semibold">Contact Us</h3>
+        <p class="text-slate-400 mt-2">Assumed store: Manila, Philippines</p>
+        <div class="mt-3 text-slate-400 text-sm">
+          <div>Hours: 10:00 - 20:00</div>
+          <div>Phone: +63 900 000 0000</div>
+          <div>Email: support@j4r-box.example</div>
+        </div>
+      </div>
+
+      <form id="contactForm" class="card p-4 rounded-lg">
+        <h4 class="font-medium">Send us a message</h4>
+        <input id="contactName" placeholder="Your name" class="w-full mt-3 px-3 py-2 rounded" />
+        <input id="contactEmail" placeholder="Email" type="email" class="w-full mt-3 px-3 py-2 rounded" />
+        <textarea id="contactMsg" rows="4" placeholder="Message" class="w-full mt-3 px-3 py-2 rounded"></textarea>
+        <div class="mt-3 flex gap-2">
+          <button class="px-4 py-2 btn-accent rounded">Send</button>
+          <button type="reset" class="px-4 py-2 rounded border">Reset</button>
+        </div>
+        <p class="text-xs text-slate-400 mt-2">Demo form — shows a toast and clears.</p>
+      </form>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="mt-12 border-t border-white/5">
+    <div class="max-w-7xl mx-auto px-4 py-6 flex flex-col md:flex-row justify-between items-center text-sm text-slate-400">
+      <div>© <span id="year"></span> J4R Box — Demo storefront</div>
+      <div class="flex items-center gap-4 mt-2 md:mt-0">
+        <a href="#shop" class="hover:text-white">Shop</a>
+        <a href="#about" class="hover:text-white">About</a>
+        <a href="#contact" class="hover:text-white">Contact</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- CART DRAWER -->
+  <div id="cartDrawer" class="fixed inset-0 z-50 hidden">
+    <div id="cartBackdrop" class="absolute inset-0 bg-black/50"></div>
+    <aside class="absolute right-0 top-0 h-full w-full sm:w-[420px] bg-gradient-to-b from-[#081021] to-[#071225] drawer drawer-closed">
+      <div class="flex items-center justify-between px-4 py-4 border-b border-white/6">
+        <h3 class="font-semibold neon">Your Cart</h3>
+        <button id="closeCart" class="p-2 rounded hover:bg-white/3">✕</button>
+      </div>
+
+      <div id="cartItems" class="p-4 space-y-3 overflow-y-auto h-[calc(100%-200px)]"></div>
+
+      <div class="border-t border-white/6 p-4">
+        <div class="flex items-center justify-between text-sm mb-3">
+          <span>Subtotal</span>
+          <span id="cartSubtotal" class="font-semibold">₱0.00</span>
+        </div>
+        <div class="flex gap-2">
+          <button id="checkoutBtn" class="flex-1 btn-accent px-4 py-2 rounded">Checkout</button>
+          <button id="clearCartBtn" class="px-4 py-2 rounded border">Clear</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- AUTH MODAL -->
+  <div id="authModal" class="fixed inset-0 z-60 hidden">
+    <div class="absolute inset-0 bg-black/60"></div>
+    <div class="absolute inset-0 grid place-items-center p-4">
+      <div class="max-w-md w-full card p-6 rounded-lg modal-pop">
+        <div class="flex items-center justify-between mb-4">
+          <h3 id="authTitle" class="font-semibold text-lg">Login</h3>
+          <button id="closeAuth" class="p-2 rounded hover:bg-white/3">✕</button>
+        </div>
+
+        <form id="loginForm" class="space-y-3">
+          <div>
+            <label class="text-xs text-slate-300">Email</label>
+            <input id="loginEmail" type="email" class="w-full px-3 py-2 rounded" required />
+          </div>
+          <div>
+            <label class="text-xs text-slate-300">Password</label>
+            <input id="loginPassword" type="password" class="w-full px-3 py-2 rounded" required />
+          </div>
+          <button class="w-full btn-accent py-2 rounded" type="submit">Login</button>
+          <p class="text-sm text-center text-slate-400">No account? <button id="switchToRegister" type="button" class="text-sky-300 underline">Register</button></p>
+        </form>
+
+        <form id="registerForm" class="space-y-3 hidden">
+          <div>
+            <label class="text-xs text-slate-300">Name</label>
+            <input id="regName" class="w-full px-3 py-2 rounded" />
+          </div>
+          <div>
+            <label class="text-xs text-slate-300">Email</label>
+            <input id="regEmail" type="email" class="w-full px-3 py-2 rounded" />
+          </div>
+          <div>
+            <label class="text-xs text-slate-300">Password</label>
+            <input id="regPassword" type="password" minlength="6" class="w-full px-3 py-2 rounded" />
+          </div>
+          <button class="w-full btn-accent py-2 rounded" type="submit">Create Account</button>
+          <p class="text-sm text-center text-slate-400">Have an account? <button id="switchToLogin" type="button" class="text-sky-300 underline">Login</button></p>
+        </form>
+
+        <p class="text-xs text-slate-400 mt-3">This demo tries your Render API if configured; otherwise it uses local simulation.</p>
+      </div>
     </div>
   </div>
 
-  <script>
-    // if you deploy the backend online later, change this link
-    const API_URL = "https://ecommerce-crud-app.onrender.com/api/users";
+  <!-- SETTINGS -->
+  <div id="settingsModal" class="fixed inset-0 z-60 hidden">
+    <div class="absolute inset-0 bg-black/60"></div>
+    <div class="absolute inset-0 grid place-items-center p-4">
+      <div class="max-w-lg w-full card p-6 rounded-lg modal-pop">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold">API Settings</h3>
+          <button id="closeSettings" class="p-2 rounded hover:bg-white/3">✕</button>
+        </div>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-slate-300">API Base URL (Render)</label>
+            <input id="apiBaseInput" placeholder="https://your-api.onrender.com" class="w-full px-3 py-2 rounded" />
+            <p class="text-xs text-slate-400 mt-1">Leave blank to use local demo data.</p>
+          </div>
+          <div class="flex gap-3">
+            <button id="saveApiBase" class="btn-accent px-4 py-2 rounded">Save</button>
+            <button id="testApiBtn" class="px-4 py-2 rounded border">Test API</button>
+          </div>
+          <div id="apiTestResult" class="text-xs text-slate-300"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    // when form is submitted
-    document.getElementById("userForm").addEventListener("submit", async (e) => {
-      e.preventDefault(); // stop the page from refreshing
+  <!-- GUIDE -->
+  <div id="guideModal" class="fixed inset-0 z-60 hidden">
+    <div class="absolute inset-0 bg-black/60"></div>
+    <div class="absolute inset-0 grid place-items-center p-4">
+      <div class="max-w-3xl w-full card p-6 rounded-lg modal-pop">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h3 class="text-xl font-semibold neon">Step-by-step: Transform to Full Store</h3>
+            <p class="text-slate-400 mt-2 text-sm">Deploy a Node/Express backend with products and auth. Set the API base in Settings to connect this frontend.</p>
+            <ul class="mt-3 text-xs text-slate-300 list-disc ml-6">
+              <li>Auth: POST /api/auth/register, POST /api/auth/login</li>
+              <li>Products: GET /api/products, POST /api/products, PUT /api/products/:id, DELETE /api/products/:id</li>
+            </ul>
+          </div>
+          <button id="closeGuide" class="p-2 rounded hover:bg-white/3">✕</button>
+        </div>
+        <ol class="mt-4 list-decimal ml-6 text-sm text-slate-300">
+          <li>Implement API with Express + Mongoose.</li>
+          <li>Deploy backend to Render and set API base in Settings.</li>
+          <li>Use Admin Tools to seed or manage products.</li>
+        </ol>
+        <div class="text-xs text-slate-400 mt-3">Demo fallback keeps app functional locally if API is missing.</div>
+      </div>
+    </div>
+  </div>
 
-      const name = document.getElementById("name").value.trim();
-      const email = document.getElementById("email").value.trim();
-      if (!name || !email) return alert("Please fill up both fields!");
+  <!-- TOAST -->
+  <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2 rounded shadow-lg"></div>
 
+  <!-- ================= JAVASCRIPT ================= -->
+  <script type="module">
+  // -------------------------
+  // Basic helpers & config
+  // -------------------------
+  const el = s => document.querySelector(s);
+  const els = s => Array.from(document.querySelectorAll(s));
+  const fmt = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' });
+
+  const API = {
+    base: localStorage.getItem('apiBase') || '',
+    routes: {
+      products() { return (API.base || '') + '/api/products'; },
+      product(id) { return (API.base || '') + '/api/products/' + id; },
+      register() { return (API.base || '') + '/api/auth/register'; },
+      login() { return (API.base || '') + '/api/auth/login'; },
+      me() { return (API.base || '') + '/api/auth/me'; }
+    }
+  };
+
+  // pre-seeded admin credentials
+  const ADMIN_CREDENTIALS = { name: "Jei Raido", email: "JeiRaido11254@gmail.com", password: "JayRide4" };
+
+  const state = {
+    products: [],
+    cart: JSON.parse(localStorage.getItem('cart') || '[]'),
+    user: JSON.parse(localStorage.getItem('user') || 'null'),
+    token: localStorage.getItem('token') || null,
+    adminMode: JSON.parse(localStorage.getItem('adminMode') || 'false'),
+    filters: { q:'', category:'all', sort:'featured' }
+  };
+
+  const uid = ()=> Math.random().toString(36).slice(2)+Date.now().toString(36);
+
+  function toast(msg, ms=2200) {
+    const t = el('#toast');
+    t.textContent = msg;
+    t.classList.remove('hidden');
+    t.style.animation = 'none';
+    requestAnimationFrame(()=> t.style.animation = 'toastIn 220ms ease forwards');
+    setTimeout(()=> t.classList.add('hidden'), ms);
+  }
+
+  // -------------------------
+  // Demo product list (local fallback)
+  // images reference your ./images/ folder when present
+  // -------------------------
+  const demoProducts = [
+    { _id: uid(), name: 'Elden Ring (PC)', category: 'virtual', price: 2699, stock: 50, image: './images/elden.jpg', description: 'Award-winning ARPG. Steam key (instant delivery).' },
+    { _id: uid(), name: 'God of War Ragnarok (PS5)', category: 'physical', price: 3495, stock: 20, image: './images/god.jpg', description: 'Physical disc for PS5. Brand new, sealed.' },
+    { _id: uid(), name: 'Genshin Genesis Crystals 6480', category: 'currency', price: 4290, stock: 999, image: './images/genshin.jpg', description: 'In-game top-up.' },
+    { _id: uid(), name: 'Razer BlackShark V2 X', category: 'accessory', price: 2499, stock: 35, image: './images/razer.png', description: 'Lightweight esports headset.' },
+    { _id: uid(), name: 'Minecraft (Java & Bedrock)', category: 'virtual', price: 1599, stock: 100, image: './images/minecraft.jpeg', description: 'PC digital code.' },
+    { _id: uid(), name: 'Nintendo Switch Pro Controller', category: 'accessory', price: 3495, stock: 15, image: './images/nintendo.jpeg', description: 'Official Pro Controller.' },
+    { _id: uid(), name: 'NBA 2K24 (PS4)', category: 'physical', price: 1995, stock: 25, image: './images/nba.jpeg', description: 'Physical disc for PS4.' },
+    { _id: uid(), name: 'Valorant Points 475', category: 'currency', price: 249, stock: 999, image: './images/valo.png', description: 'Direct top-up for Riot.' },
+    // additional demo items (placeholders)
+    { _id: uid(), name: 'Cyberpunk Expansion Pack', category: 'virtual', price: 1299, stock: 60, image: 'https://picsum.photos/seed/cp/600/400', description: 'DLC pack with skins and missions.' },
+    { _id: uid(), name: 'Gaming Mouse Pro', category: 'accessory', price: 2599, stock: 40, image: 'https://picsum.photos/seed/mouse/600/400', description: 'High DPI programmable mouse.' },
+    { _id: uid(), name: 'Steam Wallet ₱1000', category: 'currency', price: 1000, stock: 999, image: 'https://picsum.photos/seed/steam/600/400', description: 'Steam wallet code.' },
+    { _id: uid(), name: 'VR Starter Kit', category: 'accessory', price: 8999, stock: 6, image: 'https://picsum.photos/seed/vr/600/400', description: 'Entry-level VR bundle.' }
+  ];
+
+  if (!localStorage.getItem('products')) localStorage.setItem('products', JSON.stringify(demoProducts));
+
+  // -------------------------
+  // API helpers (remote if configured, otherwise local fallback)
+  // -------------------------
+  async function apiGetProducts() {
+    if (API.base) {
       try {
-        // send data to backend
-        await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email }),
-        });
-
-        // clear the form and reload table
-        document.getElementById("userForm").reset();
-        await loadUsers();
+        const res = await fetch(API.routes.products());
+        if (!res.ok) throw new Error('Bad response');
+        const data = await res.json();
+        if (!Array.isArray(data)) throw new Error('Bad payload');
+        return data;
       } catch (err) {
-        console.error("There was an error saving:", err);
-        alert("Something went wrong while saving!");
-      }
-    });
-
-    // function to load users and display them
-    async function loadUsers() {
-      try {
-        const res = await fetch(API_URL);
-        const users = await res.json();
-        console.log("Loaded users:", users);
-
-        const table = document.getElementById("userTable");
-        table.innerHTML = "";
-
-        if (users.length === 0) {
-          table.innerHTML =
-            '<tr><td colspan="2" class="text-center text-muted">No records yet.</td></tr>';
-          return;
-        }
-
-        // add every user as a new row
-        users.forEach((u) => {
-          table.innerHTML += `<tr><td>${u.name}</td><td>${u.email}</td></tr>`;
-        });
-      } catch (err) {
-        console.error("Error loading users:", err);
+        console.warn('API get products failed, falling back to local', err);
       }
     }
+    return JSON.parse(localStorage.getItem('products') || '[]');
+  }
 
-    // auto run when the page opens
-    loadUsers();
+  async function apiCreateProduct(p) {
+    if (API.base) {
+      try {
+        const res = await fetch(API.routes.products(), { method:'POST', headers:{ 'Content-Type':'application/json', ...(state.token?{'Authorization':'Bearer '+state.token}:{}) }, body: JSON.stringify(p) });
+        if (!res.ok) throw new Error('Create failed');
+        return await res.json();
+      } catch(e) { console.warn('remote create failed, falling back'); }
+    }
+    const local = JSON.parse(localStorage.getItem('products') || '[]');
+    const withId = { ...p, _id: uid() };
+    local.unshift(withId);
+    localStorage.setItem('products', JSON.stringify(local));
+    return withId;
+  }
+
+  async function apiUpdateProduct(id,p) {
+    if (API.base) {
+      try {
+        const res = await fetch(API.routes.product(id), { method:'PUT', headers:{ 'Content-Type':'application/json', ...(state.token?{'Authorization':'Bearer '+state.token}:{}) }, body: JSON.stringify(p) });
+        if (!res.ok) throw new Error('Update failed');
+        return await res.json();
+      } catch(e) { console.warn('remote update failed'); }
+    }
+    const local = JSON.parse(localStorage.getItem('products') || '[]');
+    const idx = local.findIndex(x=>x._id===id);
+    if (idx>=0) { local[idx] = { ...local[idx], ...p }; localStorage.setItem('products', JSON.stringify(local)); return local[idx]; }
+    return null;
+  }
+
+  async function apiDeleteProduct(id) {
+    if (API.base) {
+      try {
+        const res = await fetch(API.routes.product(id), { method:'DELETE', headers:{ ...(state.token?{'Authorization':'Bearer '+state.token}:{}) } });
+        if (!res.ok) throw new Error('Delete failed');
+        return true;
+      } catch(e) { console.warn('remote delete failed'); }
+    }
+    const local = JSON.parse(localStorage.getItem('products') || '[]');
+    const filtered = local.filter(x=>x._id!==id);
+    localStorage.setItem('products', JSON.stringify(filtered));
+    return true;
+  }
+
+  async function apiRegister({name,email,password}) {
+    if (API.base) {
+      try {
+        const res = await fetch(API.routes.register(), { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ name,email,password }) });
+        if (!res.ok) throw new Error('Register failed');
+        return await res.json();
+      } catch(e){ console.warn('remote register failed'); }
+    }
+    const users = JSON.parse(localStorage.getItem('localUsers') || '[]');
+    if (users.find(u=>u.email===email)) throw new Error('Email already exists (local)');
+    const u = { id: uid(), name, email, password };
+    users.push(u);
+    localStorage.setItem('localUsers', JSON.stringify(users));
+    return { user: { name, email }, token: 'local-' + uid() };
+  }
+
+  async function apiLogin({email,password}) {
+    if (API.base) {
+      try {
+        const res = await fetch(API.routes.login(), { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ email,password }) });
+        if (!res.ok) throw new Error('Login failed');
+        return await res.json();
+      } catch(e){ console.warn('remote login failed'); }
+    }
+    const users = JSON.parse(localStorage.getItem('localUsers') || '[]');
+    const u = users.find(x=>x.email===email && x.password===password);
+    if (u) return { user: { name: u.name, email: u.email }, token: 'local-' + uid() };
+    if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+      return { user: { name: ADMIN_CREDENTIALS.name, email: ADMIN_CREDENTIALS.email, admin:true }, token: 'local-admin-' + uid() };
+    }
+    throw new Error('Invalid credentials (local)');
+  }
+
+  // -------------------------
+  // UI renderers
+  // -------------------------
+  function renderProducts() {
+    const grid = el('#productGrid');
+    let list = [...state.products];
+
+    const q = state.filters.q.trim().toLowerCase();
+    if (q) list = list.filter(p => (p.name + ' ' + (p.description||'')).toLowerCase().includes(q));
+    if (state.filters.category !== 'all') list = list.filter(p => p.category === state.filters.category);
+
+    switch(state.filters.sort) {
+      case 'price-asc': list.sort((a,b)=>a.price-b.price); break;
+      case 'price-desc': list.sort((a,b)=>b.price-a.price); break;
+      case 'name-asc': list.sort((a,b)=>a.name.localeCompare(b.name)); break;
+      case 'name-desc': list.sort((a,b)=>b.name.localeCompare(a.name)); break;
+      default: break;
+    }
+
+    grid.innerHTML = list.map(p => {
+      const thumb = p.image ? `<img src="${p.image}" alt="${escapeHtml(p.name)}" class="w-full h-44 object-cover rounded" />` :
+        `<div class="h-44 img-fallback rounded text-slate-300 text-sm">No image</div>`;
+      return `
+        <div class="card p-4 rounded-lg flex flex-col">
+          <div class="mb-3">${thumb}</div>
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="font-semibold leading-tight line-clamp-2">${escapeHtml(p.name)}</div>
+              <div class="text-xs text-slate-400">${escapeHtml(p.description || '')}</div>
+            </div>
+            <div class="text-indigo-300 font-bold">${fmt.format(p.price)}</div>
+          </div>
+
+          <div class="mt-3 flex items-center justify-between">
+            <span class="text-xs px-2 py-1 rounded border text-slate-300">${p.category}</span>
+            <div class="flex items-center gap-2">
+              <button class="px-3 py-1.5 rounded bg-white/6 text-slate-100 text-sm" data-add="${p._id}">Add to Cart</button>
+              ${state.adminMode ? `<button class="px-2 py-1 rounded border text-xs" data-edit="${p._id}">Edit</button>
+                                  <button class="px-2 py-1 rounded border text-red-500" data-del="${p._id}">Delete</button>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // attach events
+    grid.querySelectorAll('[data-add]').forEach(btn => btn.addEventListener('click', ()=> addToCart(btn.getAttribute('data-add'))));
+    if (state.adminMode) {
+      grid.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', ()=> loadProductIntoForm(btn.getAttribute('data-edit'))));
+      grid.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async ()=>{
+        const id = btn.getAttribute('data-del');
+        if (confirm('Delete this product?')) {
+          await apiDeleteProduct(id);
+          await loadProducts();
+          toast('Product deleted');
+        }
+      }));
+    }
+  }
+
+  function renderAdminList() {
+    const box = el('#adminProductList');
+    box.innerHTML = state.products.map(p => `
+      <div class="py-3 flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <div class="font-medium truncate">${escapeHtml(p.name)}</div>
+          <div class="text-xs text-slate-400">${p.category} • ${fmt.format(p.price)} • stock: ${p.stock ?? 0}</div>
+        </div>
+        <div class="flex items-center gap-2 text-sm">
+          <button class="px-2 py-1 rounded border" data-edit="${p._id}">Edit</button>
+          <button class="px-2 py-1 rounded border text-red-500" data-del="${p._id}">Delete</button>
+        </div>
+      </div>
+    `).join('');
+
+    box.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', ()=> loadProductIntoForm(btn.getAttribute('data-edit'))));
+    box.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async ()=>{
+      const id = btn.getAttribute('data-del');
+      if (confirm('Delete this product?')) {
+        await apiDeleteProduct(id);
+        await loadProducts();
+        toast('Product deleted');
+      }
+    }));
+  }
+
+  function renderCart() {
+    const items = state.cart.map(ci => {
+      const p = state.products.find(x => x._id === ci.id);
+      if (!p) return null;
+      return {...p, qty: ci.qty};
+    }).filter(Boolean);
+
+    const wrap = el('#cartItems');
+    wrap.innerHTML = items.length ? items.map(it => `
+      <div class="flex gap-3 items-center">
+        <div class="w-20 h-16 rounded overflow-hidden ${it.image ? '' : 'img-fallback'}">
+          ${ it.image ? `<img src="${it.image}" alt="${escapeHtml(it.name)}" class="w-full h-full object-cover">` : '' }
+        </div>
+        <div class="min-w-0 grow">
+          <div class="font-medium truncate">${escapeHtml(it.name)}</div>
+          <div class="text-xs text-slate-400">${fmt.format(it.price)} • <span class="uppercase text-[10px] px-1 py-0.5 rounded bg-white/3">${it.category}</span></div>
+
+          <div class="mt-2 flex items-center gap-2 text-sm">
+            <button class="px-2 py-1 border rounded" data-qty="dec" data-id="${it._id}">-</button>
+            <span>${it.qty}</span>
+            <button class="px-2 py-1 border rounded" data-qty="inc" data-id="${it._id}">+</button>
+            <button class="ml-auto text-red-400 text-sm" data-remove="${it._id}">Remove</button>
+          </div>
+        </div>
+      </div>
+    `).join('') : `<div class="text-slate-400">Your cart is empty.</div>`;
+
+    wrap.querySelectorAll('[data-qty]').forEach(btn => btn.addEventListener('click', ()=> changeQty(btn.getAttribute('data-id'), btn.getAttribute('data-qty') === 'inc' ? 1 : -1 )));
+    wrap.querySelectorAll('[data-remove]').forEach(btn => btn.addEventListener('click', ()=> removeFromCart(btn.getAttribute('data-remove'))));
+
+    const subtotal = items.reduce((s,it)=> s + it.price * it.qty, 0);
+    el('#cartSubtotal').textContent = fmt.format(subtotal);
+    el('#cartCount').textContent = state.cart.reduce((a,b)=> a + b.qty, 0);
+  }
+
+  // -------------------------
+  // Admin form helpers
+  // -------------------------
+  function loadProductIntoForm(id) {
+    const p = state.products.find(x=>x._id === id);
+    if (!p) return;
+    el('#prodId').value = p._id;
+    el('#prodName').value = p.name;
+    el('#prodCategory').value = p.category;
+    el('#prodPrice').value = p.price;
+    el('#prodStock').value = p.stock ?? 0;
+    el('#prodImage').value = p.image || '';
+    el('#prodDesc').value = p.description || '';
+    el('#saveProductBtn').textContent = 'Update Product';
+    toast('Loaded into form');
+    window.scrollTo({ top: el('#shop').offsetTop - 60, behavior:'smooth' });
+  }
+
+  function resetProductForm() {
+    el('#productForm').reset();
+    el('#prodId').value = '';
+    el('#saveProductBtn').textContent = 'Save Product';
+  }
+
+  // -------------------------
+  // Cart operations
+  // -------------------------
+  function addToCart(id) {
+    const idx = state.cart.findIndex(ci => ci.id === id);
+    if (idx >= 0) state.cart[idx].qty += 1;
+    else state.cart.push({ id, qty: 1 });
+    localStorage.setItem('cart', JSON.stringify(state.cart));
+    renderCart();
+    toast('Added to cart');
+    openCart();
+  }
+
+  function changeQty(id, delta) {
+    const idx = state.cart.findIndex(ci => ci.id === id);
+    if (idx >= 0) {
+      state.cart[idx].qty += delta;
+      if (state.cart[idx].qty <= 0) state.cart.splice(idx,1);
+      localStorage.setItem('cart', JSON.stringify(state.cart));
+      renderCart();
+    }
+  }
+
+  function removeFromCart(id) {
+    state.cart = state.cart.filter(ci => ci.id !== id);
+    localStorage.setItem('cart', JSON.stringify(state.cart));
+    renderCart();
+  }
+
+  // -------------------------
+  // Drawer / modal helpers
+  // -------------------------
+  function openCart() {
+    const layer = el('#cartDrawer');
+    const aside = layer.querySelector('aside');
+    layer.classList.remove('hidden');
+    requestAnimationFrame(()=> aside.classList.replace('drawer-closed','drawer-open'));
+  }
+  function closeCart() {
+    const layer = el('#cartDrawer');
+    const aside = layer.querySelector('aside');
+    aside.classList.replace('drawer-open','drawer-closed');
+    setTimeout(()=> layer.classList.add('hidden'), 260);
+  }
+  function openModal(sel) {
+    const m = el(sel);
+    m.classList.remove('hidden');
+    const box = m.querySelector('.modal-pop');
+    if (box) { box.classList.add('modal-open'); }
+  }
+  function closeModal(sel) {
+    const m = el(sel);
+    const box = m.querySelector('.modal-pop');
+    if (box) box.classList.remove('modal-open');
+    m.classList.add('hidden');
+  }
+
+  // -------------------------
+  // Load / Init
+  // -------------------------
+  async function loadProducts() {
+    const data = await apiGetProducts();
+    state.products = data.map(p => ({ ...p, _id: p._id || p.id || uid() }));
+    renderProducts();
+    renderAdminList();
+    renderCart();
+  }
+
+  // -------------------------
+  // Auth & account UI
+  // -------------------------
+  function updateAccountUI() {
+    const label = el('#accountLabel');
+    if (state.user) {
+      label.textContent = state.user.name || state.user.email;
+      el('#logoutBtn')?.classList?.remove('hidden');
+    } else {
+      label.textContent = 'Login';
+      el('#logoutBtn')?.classList?.add('hidden');
+    }
+  }
+
+  function setAdminMode(on) {
+    state.adminMode = !!on;
+    localStorage.setItem('adminMode', JSON.stringify(state.adminMode));
+    const pnl = el('#adminPanel');
+    const badge = el('#adminModeBadge');
+    if (state.adminMode) {
+      pnl.classList.remove('hidden');
+      badge.textContent = 'Admin: ON';
+    } else {
+      pnl.classList.add('hidden');
+      badge.textContent = 'Admin: OFF';
+    }
+    renderProducts();
+    renderAdminList();
+  }
+
+  // -------------------------
+  // Event wiring
+  // -------------------------
+  el('#btnMobileMenu').addEventListener('click', ()=> el('#mobileNav').classList.toggle('hidden'));
+  el('#btnCart').addEventListener('click', openCart);
+  el('#closeCart').addEventListener('click', closeCart);
+  el('#cartBackdrop').addEventListener('click', closeCart);
+
+  el('#clearCartBtn').addEventListener('click', ()=>{
+    state.cart = [];
+    localStorage.setItem('cart','[]');
+    renderCart();
+  });
+
+  el('#checkoutBtn').addEventListener('click', ()=>{
+    if (!state.cart.length) return toast('Your cart is empty');
+    // demo checkout
+    toast('Checkout complete — fake delivery incoming 🚚');
+    state.cart = []; localStorage.setItem('cart','[]'); renderCart(); closeCart();
+  });
+
+  el('#searchInput').addEventListener('input', (e)=> { state.filters.q = e.target.value; renderProducts(); });
+  el('#categoryFilter').addEventListener('change', (e)=> { state.filters.category = e.target.value; renderProducts(); });
+  el('#sortSelect').addEventListener('change', (e)=> { state.filters.sort = e.target.value; renderProducts(); });
+
+  el('#productForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const id = el('#prodId').value;
+    const payload = {
+      name: el('#prodName').value.trim(),
+      category: el('#prodCategory').value,
+      price: Number(el('#prodPrice').value) || 0,
+      stock: Number(el('#prodStock').value) || 0,
+      image: el('#prodImage').value.trim(),
+      description: el('#prodDesc').value.trim()
+    };
+    if (!payload.name) return toast('Please fill required fields');
+    if (id) {
+      await apiUpdateProduct(id,payload);
+      toast('Product updated');
+    } else {
+      await apiCreateProduct(payload);
+      toast('Product created');
+    }
+    resetProductForm();
+    await loadProducts();
+  });
+
+  el('#resetProductBtn').addEventListener('click', resetProductForm);
+
+  el('#seedMoreBtn').addEventListener('click', ()=>{
+    const local = JSON.parse(localStorage.getItem('products') || '[]');
+    for (let i=0;i<10;i++){
+      const base = demoProducts[Math.floor(Math.random()*demoProducts.length)];
+      const clone = {...base, _id: uid(), name: base.name + ' (+'+ (Math.floor(Math.random()*1000)) +')' };
+      local.unshift(clone);
+    }
+    localStorage.setItem('products', JSON.stringify(local));
+    loadProducts();
+    toast('+10 seeded');
+  });
+
+  // auth open/close
+  function openAuth(mode='login') {
+    el('#loginForm').classList.toggle('hidden', mode !== 'login');
+    el('#registerForm').classList.toggle('hidden', mode !== 'register');
+    el('#authTitle').textContent = mode === 'login' ? 'Login' : 'Register';
+    openModal('#authModal');
+  }
+  el('#ctaLogin').addEventListener('click', ()=> openAuth('login'));
+  el('#openGuideBtn').addEventListener('click', ()=> openModal('#guideModal'));
+  el('#openGuideBtnMobile').addEventListener('click', ()=> openModal('#guideModal'));
+  el('#closeGuide').addEventListener('click', ()=> closeModal('#guideModal'));
+
+  el('#switchToRegister').addEventListener('click', ()=> openAuth('register'));
+  el('#switchToLogin').addEventListener('click', ()=> openAuth('login'));
+  el('#closeAuth').addEventListener('click', ()=> closeModal('#authModal'));
+
+  el('#loginForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const email = el('#loginEmail').value.trim();
+    const password = el('#loginPassword').value;
+    try {
+      const { user, token } = await apiLogin({ email, password });
+      state.user = user; state.token = token;
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', token);
+      updateAccountUI();
+      if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+        setAdminMode(true); toast('Logged in as Admin');
+      } else toast('Logged in');
+      closeModal('#authModal');
+    } catch(err) { toast(err.message || 'Login failed'); }
+  });
+
+  el('#registerForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const name = el('#regName').value.trim();
+    const email = el('#regEmail').value.trim();
+    const password = el('#regPassword').value;
+    try {
+      const { user, token } = await apiRegister({ name, email, password });
+      state.user = user; state.token = token;
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', token);
+      updateAccountUI();
+      toast('Registered & logged in');
+      closeModal('#authModal');
+    } catch(err) { toast(err.message || 'Register failed'); }
+  });
+
+  // inject small account menu
+  (function injectAccountMenu(){
+    const wrapper = document.createElement('div');
+    wrapper.id = 'accountMenu';
+    wrapper.className = 'hidden absolute right-4 top-16 bg-[#071726] border border-white/6 rounded-md shadow p-2 text-sm';
+    wrapper.style.zIndex = 60;
+    wrapper.innerHTML = `
+      <button id="openAuthBtnSmall" class="w-full text-left px-3 py-2 rounded hover:bg-white/3">Login / Register</button>
+      <button id="logoutBtn" class="w-full text-left px-3 py-2 rounded hover:bg-white/3 hidden">Logout</button>
+      <div class="border-t border-white/6 my-2"></div>
+      <button id="openSettingsBtn" class="w-full text-left px-3 py-2 rounded hover:bg-white/3">API Settings</button>
+      <button id="toggleAdminBtn" class="w-full text-left px-3 py-2 rounded hover:bg-white/3">Toggle Admin Tools</button>
+    `;
+    document.body.appendChild(wrapper);
+
+    el('#btnAccount').addEventListener('click', (ev)=>{
+      wrapper.classList.toggle('hidden');
+      wrapper.style.right = '1rem';
+    });
+
+    document.addEventListener('click', (e)=> {
+      if (!e.target.closest('#accountMenu') && !e.target.closest('#btnAccount')) wrapper.classList.add('hidden');
+    });
+
+    el('#openAuthBtnSmall').addEventListener('click', ()=> openAuth('login'));
+    el('#openSettingsBtn').addEventListener('click', ()=> openModal('#settingsModal'));
+    el('#toggleAdminBtn').addEventListener('click', ()=> { setAdminMode(!state.adminMode); toast('Admin ' + (state.adminMode ? 'enabled' : 'disabled')); });
+    el('#logoutBtn').addEventListener('click', ()=>{
+      state.user = null; state.token = null; localStorage.removeItem('user'); localStorage.removeItem('token');
+      updateAccountUI(); setAdminMode(false); toast('Logged out'); wrapper.classList.add('hidden');
+    });
+  })();
+
+  // settings modal actions
+  el('#closeSettings').addEventListener('click', ()=> closeModal('#settingsModal'));
+  el('#saveApiBase').addEventListener('click', ()=>{
+    setApiBase(el('#apiBaseInput').value.trim());
+    toast('API base saved'); closeModal('#settingsModal'); loadProducts();
+  });
+  el('#testApiBtn').addEventListener('click', async ()=>{
+    const url = (el('#apiBaseInput').value || '').replace(/\/$/,'') + '/api/products';
+    el('#apiTestResult').textContent = 'Testing...';
+    try { const res = await fetch(url); el('#apiTestResult').textContent = 'GET /api/products → ' + res.status + ' ' + (res.ok? 'OK' : res.statusText); }
+    catch(err){ el('#apiTestResult').textContent = 'Failed to reach ' + url; }
+  });
+
+  el('#closeGuide').addEventListener('click', ()=> closeModal('#guideModal'));
+
+  el('#contactForm').addEventListener('submit', (e)=> { e.preventDefault(); toast('Message sent (demo)'); e.target.reset(); });
+
+  function setApiBase(url) {
+    API.base = (url || '').replace(/\/$/,'');
+    localStorage.setItem('apiBase', API.base);
+    el('#backendUrlLabel').textContent = API.base || 'local';
+    el('#apiBaseInput').value = API.base || '';
+  }
+
+  // small escape helper
+  function escapeHtml(str) {
+    if (!str) return '';
+    return (''+str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+  }
+
+  // expose some helpers for debugging in console
+  window.__J4R = { state, loadProducts, apiGetProducts, apiCreateProduct, apiUpdateProduct, apiDeleteProduct };
+
+  // init
+  (function init(){
+    setApiBase(localStorage.getItem('apiBase') || '');
+    el('#year').textContent = new Date().getFullYear();
+    state.adminMode = JSON.parse(localStorage.getItem('adminMode') || 'false');
+    setAdminMode(state.adminMode);
+    updateAccountUI();
+    loadProducts();
+
+    // ensure admin simulated user exists locally
+    const localUsers = JSON.parse(localStorage.getItem('localUsers') || '[]');
+    if (!localUsers.find(u=>u.email === ADMIN_CREDENTIALS.email)) {
+      localUsers.push({ id: uid(), name: ADMIN_CREDENTIALS.name, email: ADMIN_CREDENTIALS.email, password: ADMIN_CREDENTIALS.password });
+      localStorage.setItem('localUsers', JSON.stringify(localUsers));
+    }
+
+    // animate initial modals softly
+    document.querySelectorAll('.modal-pop').forEach(n => n.classList.add('modal-open'));
+    setTimeout(()=> document.querySelectorAll('.modal-pop').forEach(n => n.classList.remove('modal-open')), 0);
+  })();
+
+  // -------------------------
+  // Tubes Cursor integration (site-wide)
+  // -------------------------
+  // Uses the threejs-components tubes cursor module from jsDelivr
+  // If you serve via file:// modules may be blocked — run a simple static server (Live Server).
+  try {
+    const { default: TubesCursor } = await import('https://cdn.jsdelivr.net/npm/threejs-components@0.0.19/build/cursors/tubes1.min.js');
+    // initialize the tubes cursor on the canvas element
+    const app = TubesCursor(document.getElementById('canvas'), {
+      tubes: {
+        colors: ["#38b6ff", "#7c3aed", "#60aed5"],
+        lights: { intensity: 180, colors: ["#7cf36e", "#fe8a2e", "#ff008a", "#60aed5"] }
+      },
+      // pointer effect options can be customized if needed
+    });
+
+    // clicking toggles random colours — feel free to adjust
+    document.body.addEventListener('click', () => {
+      const colors = randomColors(3);
+      const lightsColors = randomColors(4);
+      app.tubes.setColors(colors);
+      app.tubes.setLightsColors(lightsColors);
+    });
+
+    function randomColors(count) {
+      return new Array(count).fill(0).map(() => "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6,'0'));
+    }
+  } catch (err) {
+    console.warn('TubesCursor module failed to load (CORS or network). If using file:// run a local http server.', err);
+  }
+
   </script>
 </body>
 </html>
