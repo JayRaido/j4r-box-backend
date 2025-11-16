@@ -56,10 +56,10 @@ const demoProducts = [
   { _id: uid(), name: 'NBA 2K24 (PS4)', category: 'physical', price: 1995, stock: 25, image: './images/nba.jpeg', description: 'Physical disc for PS4.' },
   { _id: uid(), name: 'Valorant Points 475', category: 'currency', price: 249, stock: 999, image: './images/valo.png', description: 'Direct top-up for Riot.' },
   // additional demo items (placeholders)
-  { _id: uid(), name: 'Cyberpunk Expansion Pack', category: 'virtual', price: 1299, stock: 60, image: 'https://picsum.photos/seed/cp/600/400', description: 'DLC pack with skins and missions.' },
-  { _id: uid(), name: 'Gaming Mouse Pro', category: 'accessory', price: 2599, stock: 40, image: 'https://picsum.photos/seed/mouse/600/400', description: 'High DPI programmable mouse.' },
-  { _id: uid(), name: 'Steam Wallet ₱1000', category: 'currency', price: 1000, stock: 999, image: 'https://picsum.photos/seed/steam/600/400', description: 'Steam wallet code.' },
-  { _id: uid(), name: 'VR Starter Kit', category: 'accessory', price: 8999, stock: 6, image: 'https://picsum.photos/seed/vr/600/400', description: 'Entry-level VR bundle.' }
+  { _id: uid(), name: 'Cyberpunk Expansion Pack', category: 'virtual', price: 1299, stock: 60, image: './images/cyber.png', description: 'DLC pack with skins and missions.' },
+  { _id: uid(), name: 'Logitech Pro 2', category: 'accessory', price: 2599, stock: 40, image: './images/mouse.png', description: 'High DPI programmable mouse.' },
+  { _id: uid(), name: 'Steam Wallet ₱1000', category: 'currency', price: 1000, stock: 999, image: './images/steam.png', description: 'Steam wallet code.' },
+  { _id: uid(), name: 'Oculus Quest', category: 'accessory', price: 20000, stock: 6, image: './images/oculus.png', description: 'Entry-level VR bundle.' }
 ];
 
 if (!localStorage.getItem('products')) localStorage.setItem('products', JSON.stringify(demoProducts));
