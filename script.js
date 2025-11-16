@@ -221,9 +221,6 @@ function closeAuth() {
     el("#authModal").classList.add("hidden");
 }
 
-// ===============================================
-// INIT + EVENT BINDINGS
-// ===============================================
 document.addEventListener("DOMContentLoaded", async () => {
 
     // Load products
@@ -231,6 +228,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderProducts();
     renderCart();
     updateAccountUI();
+
+    // ============================
+    // FORCE LOGIN WHEN WEBSITE OPENS
+    // ============================
+    if (!state.user) {
+        setTimeout(() => openAuth("login"), 300);
+    }
 
     // Search
     el("#searchInput").addEventListener("input", e => {
@@ -244,67 +248,100 @@ document.addEventListener("DOMContentLoaded", async () => {
         renderProducts();
     });
 
-    // Sorting
+    // Sort
     el("#sortSelect").addEventListener("change", e => {
         state.filters.sort = e.target.value;
         renderProducts();
     });
 
-    // Open Auth
-    el("#btnAccount").addEventListener("click", () => openAuth("login"));
-    el("#ctaLogin").addEventListener("click", () => openAuth("login"));
+    // ============================
+    // ACCOUNT BUTTON (OPEN LOGIN)
+    // ============================
+    el("#btnAccount").addEventListener("click", () => {
+        openAuth("login");
+    });
 
-    // Close Auth
-    el("#closeAuth")?.addEventListener("click", closeAuth);
+    el("#ctaLogin").addEventListener("click", () => {
+        openAuth("login");
+    });
 
-    // Login form
+    // ============================
+    // CLOSE AUTH MODAL
+    // ============================
+    el("#closeAuth")?.addEventListener("click", () => {
+        closeAuth();
+    });
+
+    // ============================
+    // LOGIN FUNCTIONALITY
+    // ============================
     el("#loginForm").addEventListener("submit", async (e) => {
         e.preventDefault();
-        const email = el("#loginEmail").value;
-        const password = el("#loginPassword").value;
+        const email = el("#loginEmail").value.trim();
+        const password = el("#loginPassword").value.trim();
 
         try {
             const res = await apiLogin({ email, password });
             state.user = res.user;
-            localStorage.setItem("user", JSON.stringify(state.user));
-            updateAccountUI();
+            localStorage.setItem("user", JSON.stringify(res.user));
+
             closeAuth();
-            toast("Login successful!");
-        } catch (err) {
-            toast("Invalid email / password");
+            updateAccountUI();
+            toast("Logged in successfully!");
+        } 
+        catch (err) {
+            toast("Invalid email or password");
         }
     });
 
-    // Register
+    // ============================
+    // REGISTER
+    // ============================
     el("#registerForm").addEventListener("submit", async (e) => {
         e.preventDefault();
-        const name = el("#regName").value;
-        const email = el("#regEmail").value;
-        const password = el("#regPassword").value;
+        const name = el("#regName").value.trim();
+        const email = el("#regEmail").value.trim();
+        const password = el("#regPassword").value.trim();
 
         try {
             await apiRegister({ name, email, password });
-            toast("Account created!");
+            toast("Account created! Please log in.");
             openAuth("login");
         } catch (err) {
             toast(err.message);
         }
     });
 
-    // Cart
+    // ============================
+    // CART OPEN/CLOSE
+    // ============================
     el("#btnCart").addEventListener("click", () => {
         el("#cartDrawer").classList.remove("hidden");
     });
-    el("#closeCart")?.addEventListener("click", () => {
+
+    el("#closeCart").addEventListener("click", () => {
         el("#cartDrawer").classList.add("hidden");
     });
 
-    el("#checkoutBtn")?.addEventListener("click", () => {
-        if (!state.user) return toast("Please log in first.");
-        if (!state.cart.length) return toast("Your cart is empty.");
+    // ============================
+    // CHECKOUT REQUIRES LOGIN
+    // ============================
+    el("#checkoutBtn").addEventListener("click", () => {
+        if (!state.user) {
+            toast("Please login first.");
+            openAuth("login");
+            return;
+        }
+
+        if (!state.cart.length) {
+            toast("Your cart is empty.");
+            return;
+        }
+
         toast("Order placed! Delivery incoming 🚚");
         state.cart = [];
         localStorage.setItem("cart", "[]");
         renderCart();
     });
+
 });

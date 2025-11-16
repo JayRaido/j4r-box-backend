@@ -40,11 +40,11 @@
           <a href="#contact" class="hover:text-white">Contact</a>
         </nav>
 
-        <div class="flex items-center gap-3">
-          <button id="btnAccount" class="p-2 rounded-md hover:bg-white/3 flex items-center gap-2">
-            <svg class="w-5 h-5 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15.75 6a3.75 3.75 0 1 1-7.5 0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span id="accountLabel" class="text-sm text-slate-200">Login</span>
-          </button>
+        <!-- ACCOUNT BUTTON (REPLACES THE "U" ICON) -->
+<button id="btnAccount" class="flex items-center gap-2 hover:opacity-80">
+    <img src="./images/login-logo.png" class="w-6 h-6 object-cover rounded" />
+    <span id="accountLabel">Login</span>
+</button>
 
           <button id="btnCart" class="relative p-2 rounded-md hover:bg-white/3">
             <svg class="w-6 h-6 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -72,7 +72,11 @@
   <section id="home" class="h-screen -mt-16 flex items-center justify-center text-center">
     <div class="max-w-3xl mx-auto px-4 sm:px-6">
       <div class="space-y-4">
-          <h1 class="text-5xl md:text-7xl font-extrabold neon">One Stop, All Games.</h1>
+          <h1 class="text-6xl font-extrabold text-center leading-tight">
+    <span class="text-white/70 drop-shadow">One Stop, All</span><br>
+    <span class="text-blue-400 drop-shadow-xl">Games.</span>
+</h1>
+
           <p class="text-slate-300 max-w-xl mx-auto text-lg">Your ultimate hub for digital keys, physical copies, and in-game currency. Get back in the game, faster.</p>
           <div class="flex items-center justify-center gap-4 pt-4">
               <a href="#shop" class="px-6 py-3 rounded btn-accent font-semibold shadow-lg text-lg">Browse The Shop</a>
