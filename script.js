@@ -2,7 +2,6 @@
 // J4R BOX - E-COMMERCE LOGIC
 // ===============================================
 
-// Basic helpers & config
 const el = s => document.querySelector(s);
 const els = s => Array.from(document.querySelectorAll(s));
 const fmt = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' });
@@ -28,9 +27,7 @@ function toast(msg, ms = 2200) {
     setTimeout(() => t.classList.add('hidden'), ms);
 }
 
-// Demo product list (local fallback)
 const demoProducts = [
-    // ... (Your 12 products remain here)
     { _id: uid(), name: 'Elden Ring (PC)', category: 'virtual', price: 2699, stock: 50, image: './images/elden.jpg', description: 'Award-winning ARPG. Steam key (instant delivery).' },
     { _id: uid(), name: 'God of War Ragnarok (PS5)', category: 'physical', price: 3495, stock: 20, image: './images/god.jpg', description: 'Physical disc for PS5. Brand new, sealed.' },
     { _id: uid(), name: 'Genshin Genesis Crystals 6480', category: 'currency', price: 4290, stock: 999, image: './images/genshin.jpg', description: 'In-game top-up.' },
@@ -48,18 +45,48 @@ const demoProducts = [
 if (!localStorage.getItem('products')) localStorage.setItem('products', JSON.stringify(demoProducts));
 
 // --- API Helpers (Local Simulation) ---
-async function apiGetProducts() { /* ... unchanged ... */ return JSON.parse(localStorage.getItem('products') || '[]'); }
-async function apiCreateProduct(p) { /* ... unchanged ... */ }
-async function apiUpdateProduct(id, p) { /* ... unchanged ... */ }
-async function apiDeleteProduct(id) { /* ... unchanged ... */ }
-async function apiRegister({ name, email, password }) { /* ... unchanged ... */ }
+async function apiGetProducts() { return JSON.parse(localStorage.getItem('products') || '[]'); }
+
+async function apiCreateProduct(p) {
+    const local = JSON.parse(localStorage.getItem('products') || '[]');
+    const withId = { ...p, _id: uid() };
+    local.unshift(withId);
+    localStorage.setItem('products', JSON.stringify(local));
+    return withId;
+}
+
+async function apiUpdateProduct(id, p) {
+    const local = JSON.parse(localStorage.getItem('products') || '[]');
+    const idx = local.findIndex(x => x._id === id);
+    if (idx >= 0) {
+        local[idx] = { ...local[idx], ...p };
+        localStorage.setItem('products', JSON.stringify(local));
+        return local[idx];
+    }
+    return null;
+}
+
+async function apiDeleteProduct(id) {
+    const local = JSON.parse(localStorage.getItem('products') || '[]');
+    const filtered = local.filter(x => x._id !== id);
+    localStorage.setItem('products', JSON.stringify(filtered));
+    return true;
+}
+
+async function apiRegister({ name, email, password }) {
+    const users = JSON.parse(localStorage.getItem('localUsers') || '[]');
+    if (users.find(u => u.email === email)) throw new Error('Email already exists');
+    const u = { id: uid(), name, email, password };
+    users.push(u);
+    localStorage.setItem('localUsers', JSON.stringify(users));
+    return { user: { name, email }, token: 'local-' + uid() };
+}
+
 async function apiLogin({ email, password }) {
-    // Local simulation
     const users = JSON.parse(localStorage.getItem('localUsers') || '[]');
     const u = users.find(x => x.email === email && x.password === password);
     if (u) return { user: { name: u.name, email: u.email }, token: 'local-' + uid() };
-    
-    // Check for admin
+
     if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
         return { user: { name: ADMIN_CREDENTIALS.name, email: ADMIN_CREDENTIALS.email, admin: true }, token: 'local-admin-' + uid() };
     }
@@ -71,20 +98,18 @@ function renderProducts() {
     const grid = el('#productGrid');
     let list = [...state.products];
 
-    // Filtering and sorting logic remains the same...
     const q = state.filters.q.trim().toLowerCase();
-    if (q) list = list.filter(p => (p.name + ' ' + (p.description||'')).toLowerCase().includes(q));
+    if (q) list = list.filter(p => (p.name + ' ' + (p.description || '')).toLowerCase().includes(q));
     if (state.filters.category !== 'all') list = list.filter(p => p.category === state.filters.category);
 
-    switch(state.filters.sort) {
-      case 'price-asc': list.sort((a,b)=>a.price-b.price); break;
-      case 'price-desc': list.sort((a,b)=>b.price-a.price); break;
-      case 'name-asc': list.sort((a,b)=>a.name.localeCompare(b.name)); break;
-      case 'name-desc': list.sort((a,b)=>b.name.localeCompare(a.name)); break;
-      default: break;
+    switch (state.filters.sort) {
+        case 'price-asc': list.sort((a, b) => a.price - b.price); break;
+        case 'price-desc': list.sort((a, b) => b.price - a.price); break;
+        case 'name-asc': list.sort((a, b) => a.name.localeCompare(b.name)); break;
+        case 'name-desc': list.sort((a, b) => b.name.localeCompare(a.name)); break;
+        default: break;
     }
 
-    // UPDATED RENDERER FOR ALIGNMENT
     grid.innerHTML = list.map(p => {
         const thumb = p.image ? `<img src="${p.image}" alt="${escapeHtml(p.name)}" class="w-full h-44 object-cover rounded" />` :
             `<div class="h-44 img-fallback rounded text-sm">No image</div>`;
@@ -116,7 +141,6 @@ function renderProducts() {
       `;
     }).join('');
 
-    // Re-attach events
     grid.querySelectorAll('[data-add]').forEach(btn => btn.addEventListener('click', () => addToCart(btn.getAttribute('data-add'))));
     if (state.user && state.user.email === ADMIN_CREDENTIALS.email) {
         grid.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => loadProductIntoForm(btn.getAttribute('data-edit'))));
@@ -130,20 +154,149 @@ function renderProducts() {
         }));
     }
 }
-// Other renderers (renderAdminList, renderCart) remain mostly the same...
-function renderAdminList() { /* ... unchanged ... */ }
-function renderCart() { /* ... unchanged ... */ }
+
+function renderAdminList() {
+    const box = el('#adminProductList');
+    if (!box) return;
+    box.innerHTML = state.products.map(p => `
+      <div class="py-3 flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <div class="font-medium truncate">${escapeHtml(p.name)}</div>
+          <div class="text-xs text-slate-400">${p.category} • ${fmt.format(p.price)} • stock: ${p.stock ?? 0}</div>
+        </div>
+        <div class="flex items-center gap-2 text-sm">
+          <button class="px-2 py-1 rounded border" data-edit="${p._id}">Edit</button>
+          <button class="px-2 py-1 rounded border text-red-500" data-del="${p._id}">Delete</button>
+        </div>
+      </div>
+    `).join('');
+
+    box.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => loadProductIntoForm(btn.getAttribute('data-edit'))));
+    box.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-del');
+        if (confirm('Are you sure you want to delete this product?')) {
+            await apiDeleteProduct(id);
+            await loadProducts();
+            toast('Product deleted');
+        }
+    }));
+}
+
+function renderCart() {
+    const items = state.cart.map(ci => {
+        const p = state.products.find(x => x._id === ci.id);
+        if (!p) return null;
+        return { ...p, qty: ci.qty };
+    }).filter(Boolean);
+
+    const wrap = el('#cartItems');
+    if (!wrap) return;
+    wrap.innerHTML = items.length ? items.map(it => `
+      <div class="flex gap-3 items-center">
+        <div class="w-20 h-16 rounded overflow-hidden ${it.image ? '' : 'img-fallback'}">
+          ${it.image ? `<img src="${it.image}" alt="${escapeHtml(it.name)}" class="w-full h-full object-cover">` : ''}
+        </div>
+        <div class="min-w-0 grow">
+          <div class="font-medium truncate">${escapeHtml(it.name)}</div>
+          <div class="text-xs text-slate-400">${fmt.format(it.price)} • <span class="uppercase text-[10px] px-1 py-0.5 rounded bg-white/3">${it.category}</span></div>
+          <div class="mt-2 flex items-center gap-2 text-sm">
+            <button class="px-2 py-1 border rounded" data-qty="dec" data-id="${it._id}">-</button>
+            <span>${it.qty}</span>
+            <button class="px-2 py-1 border rounded" data-qty="inc" data-id="${it._id}">+</button>
+            <button class="ml-auto text-red-400 text-sm" data-remove="${it._id}">Remove</button>
+          </div>
+        </div>
+      </div>
+    `).join('') : `<div class="text-slate-400">Your cart is empty.</div>`;
+
+    wrap.querySelectorAll('[data-qty]').forEach(btn => btn.addEventListener('click', () => changeQty(btn.getAttribute('data-id'), btn.getAttribute('data-qty') === 'inc' ? 1 : -1)));
+    wrap.querySelectorAll('[data-remove]').forEach(btn => btn.addEventListener('click', () => removeFromCart(btn.getAttribute('data-remove'))));
+
+    const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
+    el('#cartSubtotal').textContent = fmt.format(subtotal);
+    el('#cartCount').textContent = state.cart.reduce((a, b) => a + b.qty, 0);
+}
+
 
 // --- Admin, Cart, Modal Helpers ---
-function loadProductIntoForm(id) { /* ... unchanged ... */ }
-function resetProductForm() { /* ... unchanged ... */ }
-function addToCart(id) { /* ... unchanged ... */ }
-function changeQty(id, delta) { /* ... unchanged ... */ }
-function removeFromCart(id) { /* ... unchanged ... */ }
-function openCart() { /* ... unchanged ... */ }
-function closeCart() { /* ... unchanged ... */ }
-function openModal(sel) { /* ... unchanged ... */ }
-function closeModal(sel) { /* ... unchanged ... */ }
+function loadProductIntoForm(id) {
+    const p = state.products.find(x => x._id === id);
+    if (!p) return;
+    el('#prodId').value = p._id;
+    el('#prodName').value = p.name;
+    el('#prodCategory').value = p.category;
+    el('#prodPrice').value = p.price;
+    el('#prodStock').value = p.stock ?? 0;
+    el('#prodImage').value = p.image || '';
+    el('#prodDesc').value = p.description || '';
+    el('#saveProductBtn').textContent = 'Update Product';
+    toast('Loaded product into form');
+    window.scrollTo({ top: el('#adminPanel').offsetTop - 80, behavior: 'smooth' });
+}
+
+function resetProductForm() {
+    el('#productForm').reset();
+    el('#prodId').value = '';
+    el('#saveProductBtn').textContent = 'Save Product';
+}
+
+function addToCart(id) {
+    const idx = state.cart.findIndex(ci => ci.id === id);
+    if (idx >= 0) state.cart[idx].qty += 1;
+    else state.cart.push({ id, qty: 1 });
+    localStorage.setItem('cart', JSON.stringify(state.cart));
+    renderCart();
+    toast('Added to cart');
+    openCart();
+}
+
+function changeQty(id, delta) {
+    const idx = state.cart.findIndex(ci => ci.id === id);
+    if (idx >= 0) {
+        state.cart[idx].qty += delta;
+        if (state.cart[idx].qty <= 0) state.cart.splice(idx, 1);
+        localStorage.setItem('cart', JSON.stringify(state.cart));
+        renderCart();
+    }
+}
+
+function removeFromCart(id) {
+    state.cart = state.cart.filter(ci => ci.id !== id);
+    localStorage.setItem('cart', JSON.stringify(state.cart));
+    renderCart();
+}
+
+function openCart() {
+    const layer = el('#cartDrawer');
+    if (!layer) return;
+    const aside = layer.querySelector('aside');
+    layer.classList.remove('hidden');
+    requestAnimationFrame(() => aside.classList.replace('drawer-closed', 'drawer-open'));
+}
+
+function closeCart() {
+    const layer = el('#cartDrawer');
+    if (!layer) return;
+    const aside = layer.querySelector('aside');
+    aside.classList.replace('drawer-open', 'drawer-closed');
+    setTimeout(() => layer.classList.add('hidden'), 260);
+}
+
+function openModal(sel) {
+    const m = el(sel);
+    if (!m) return;
+    m.classList.remove('hidden');
+    const box = m.querySelector('.modal-pop');
+    if (box) { box.classList.add('modal-open'); }
+}
+
+function closeModal(sel) {
+    const m = el(sel);
+    if (!m) return;
+    const box = m.querySelector('.modal-pop');
+    if (box) box.classList.remove('modal-open');
+    setTimeout(() => m.classList.add('hidden'), 220);
+}
 
 async function loadProducts() {
     const data = await apiGetProducts();
@@ -157,7 +310,7 @@ async function loadProducts() {
 function updateAccountUI() {
     const label = el('#accountLabel');
     if (state.user) {
-        label.textContent = state.user.name || state.user.email;
+        label.textContent = state.user.name.split(' ')[0];
         el('#logoutBtn')?.classList?.remove('hidden');
         el('#openAuthBtnSmall')?.classList?.add('hidden');
     } else {
@@ -165,25 +318,36 @@ function updateAccountUI() {
         el('#logoutBtn')?.classList?.add('hidden');
         el('#openAuthBtnSmall')?.classList?.remove('hidden');
     }
-    // Automatically set admin mode based on user
     setAdminMode(state.user && state.user.email === ADMIN_CREDENTIALS.email);
 }
 
 function setAdminMode(isAdmin) {
     el('#adminPanel').classList.toggle('hidden', !isAdmin);
-    renderProducts(); // Re-render products to show/hide admin buttons
+    renderProducts();
 }
 
-// --- Event Wiring ---
+
+// --- Auth Modal Global Listeners ---
+function openAuth(mode = 'login') {
+    el('#loginForm').classList.toggle('hidden', mode !== 'login');
+    el('#registerForm').classList.toggle('hidden', mode !== 'register');
+    el('#authTitle').textContent = mode === 'login' ? 'Login' : 'Register';
+    openModal('#authModal');
+}
+el('#ctaLogin').addEventListener('click', () => openAuth('login'));
+el('#switchToRegister').addEventListener('click', () => openAuth('register'));
+el('#switchToLogin').addEventListener('click', () => openAuth('login'));
+el('#closeAuth').addEventListener('click', () => closeModal('#authModal'));
+
+
+// --- Main Application Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // Header & Nav
+
     el('#btnMobileMenu').addEventListener('click', () => el('#mobileNav').classList.toggle('hidden'));
     el('#btnCart').addEventListener('click', openCart);
     el('#closeCart').addEventListener('click', closeCart);
     el('#cartBackdrop').addEventListener('click', closeCart);
 
-    // Cart Actions
     el('#clearCartBtn').addEventListener('click', () => {
         state.cart = [];
         localStorage.setItem('cart', '[]');
@@ -192,14 +356,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el('#checkoutBtn').addEventListener('click', () => {
         if (!state.cart.length) return toast('Your cart is empty.');
-        // NEW: Check if user is logged in
         if (!state.user) {
             toast('Please log in to check out.');
             closeCart();
             openAuth('login');
             return;
         }
-        // If logged in, proceed
         toast('Checkout complete! Your order is on its way.');
         state.cart = [];
         localStorage.setItem('cart', '[]');
@@ -207,28 +369,36 @@ document.addEventListener('DOMContentLoaded', () => {
         closeCart();
     });
 
-    // Shop Controls
     el('#searchInput').addEventListener('input', (e) => { state.filters.q = e.target.value; renderProducts(); });
     el('#categoryFilter').addEventListener('change', (e) => { state.filters.category = e.target.value; renderProducts(); });
     el('#sortSelect').addEventListener('change', (e) => { state.filters.sort = e.target.value; renderProducts(); });
 
-    // Admin Form
-    el('#productForm').addEventListener('submit', async (e) => { /* ... unchanged ... */ });
-    el('#resetProductBtn').addEventListener('click', resetProductForm);
-
-    // Auth Modals
-    function openAuth(mode = 'login') {
-        el('#loginForm').classList.toggle('hidden', mode !== 'login');
-        el('#registerForm').classList.toggle('hidden', mode !== 'register');
-        el('#authTitle').textContent = mode === 'login' ? 'Login' : 'Register';
-        openModal('#authModal');
+    if (el('#productForm')) {
+        el('#productForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = el('#prodId').value;
+            const payload = {
+                name: el('#prodName').value.trim(),
+                category: el('#prodCategory').value,
+                price: Number(el('#prodPrice').value) || 0,
+                stock: Number(el('#prodStock').value) || 0,
+                image: el('#prodImage').value.trim(),
+                description: el('#prodDesc').value.trim()
+            };
+            if (!payload.name) return toast('Product name is required.');
+            if (id) {
+                await apiUpdateProduct(id, payload);
+                toast('Product updated');
+            } else {
+                await apiCreateProduct(payload);
+                toast('Product created');
+            }
+            resetProductForm();
+            await loadProducts();
+        });
+        el('#resetProductBtn').addEventListener('click', resetProductForm);
     }
-    el('#ctaLogin').addEventListener('click', () => openAuth('login'));
-    el('#switchToRegister').addEventListener('click', () => openAuth('register'));
-    el('#switchToLogin').addEventListener('click', () => openAuth('login'));
-    el('#closeAuth').addEventListener('click', () => closeModal('#authModal'));
-
-    // Auth Forms
+    
     el('#loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = el('#loginEmail').value.trim();
@@ -238,15 +408,39 @@ document.addEventListener('DOMContentLoaded', () => {
             state.user = user;
             localStorage.setItem('user', JSON.stringify(user));
             updateAccountUI();
-            toast(`Welcome back, ${user.name || user.email}!`);
+            toast(`Welcome back, ${user.name.split(' ')[0]}!`);
             closeModal('#authModal');
         } catch (err) {
             toast(err.message || 'Login failed');
         }
     });
-    el('#registerForm').addEventListener('submit', async (e) => { /* ... unchanged ... */ });
 
-    // Simplified Account Menu
+    el('#registerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = el('#regName').value.trim();
+        const email = el('#regEmail').value.trim();
+        const password = el('#regPassword').value;
+        if (!name || !email) return toast('Name and email are required.');
+        if (password.length < 6) return toast('Password must be at least 6 characters.');
+        try {
+            const { user } = await apiRegister({ name, email, password });
+            state.user = user;
+            localStorage.setItem('user', JSON.stringify(user));
+            updateAccountUI();
+            toast('Account created! Welcome to J4R Box.');
+            closeModal('#authModal');
+        } catch (err) {
+            toast(err.message || 'Registration failed');
+        }
+    });
+
+    el('#contactForm').addEventListener('submit', (e) => { e.preventDefault(); toast('Message sent successfully!'); e.target.reset(); });
+    
+    function escapeHtml(str) {
+        if (!str) return '';
+        return ('' + str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
+    }
+    
     (function injectAccountMenu() {
         const wrapper = document.createElement('div');
         wrapper.id = 'accountMenu';
@@ -258,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         document.body.appendChild(wrapper);
 
-        el('#btnAccount').addEventListener('click', (ev) => {
+        el('#btnAccount').addEventListener('click', () => {
             wrapper.classList.toggle('hidden');
         });
 
@@ -278,18 +472,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     })();
 
-    // Contact Form
-    el('#contactForm').addEventListener('submit', (e) => { e.preventDefault(); toast('Message sent successfully!'); e.target.reset(); });
-    
-    function escapeHtml(str) { /* ... unchanged ... */ }
-
-    // --- Init ---
     (function init() {
         el('#year').textContent = new Date().getFullYear();
         updateAccountUI();
         loadProducts();
 
-        // Ensure admin simulated user exists locally
         const localUsers = JSON.parse(localStorage.getItem('localUsers') || '[]');
         if (!localUsers.find(u => u.email === ADMIN_CREDENTIALS.email)) {
             localUsers.push({ id: uid(), ...ADMIN_CREDENTIALS });
@@ -298,18 +485,16 @@ document.addEventListener('DOMContentLoaded', () => {
     })();
 });
 
+
 // ===============================================
-// NEW MOUSE TRAIL EFFECT
+// MOUSE TRAIL EFFECT
 // ===============================================
 var canvas = document.querySelector('#c'),
     ctx = canvas.getContext('2d'),
     points = [],
     m = { x: null, y: null };
 
-var a = 20; // how many dots
-var b = 5; // how fast to spin
-var c = 0.1; // how much to fade
-var d = 100; // distance from mouse
+var a = 20, b = 5, c = 0.1, d = 100;
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
@@ -337,7 +522,7 @@ for (var i = 0; i < a; i++) {
 
 function render() {
     if (m.x == null || m.y == null) return;
-    ctx.fillStyle = `rgba(5, 8, 11, ${c})`; // Match the --bg color for a seamless fade
+    ctx.fillStyle = `rgba(5, 8, 11, ${c})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.lineCap = 'round';
     for (var i = 0; i < points.length; i++) {
@@ -363,7 +548,7 @@ function render() {
 }
 
 window.requestAnimFrame = (() => {
-    return window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || function (callback) { window.setTimeout(callback, 1000 / 60); };
+    return window.requestAnimationFrame || function (callback) { window.setTimeout(callback, 1000 / 60); };
 })();
 
 (function animloop() {
