@@ -249,12 +249,12 @@ app.delete('/api/products/:id', authMiddleware, adminMiddleware, async (req, res
 });
 
 // ===== SEED DATA (One-time setup) =====
-app.post('/api/seed', async (req, res) => {
+app.get('/api/seed', async (req, res) => {  // ← Changed POST to GET
   try {
     // Check if products already exist
     const count = await Product.countDocuments();
     if (count > 0) {
-      return res.json({ message: 'Database already seeded' });
+      return res.json({ message: 'Database already seeded', count });
     }
 
     // Seed products
