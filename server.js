@@ -38,7 +38,7 @@ const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   category: { 
     type: String, 
-    enum: ['virtual', 'physical', 'currency', 'accessory'],
+    enum: ['digital', 'physical', 'currency'],
     required: true 
   },
   price: { type: Number, required: true },
@@ -87,7 +87,10 @@ app.get('/', (req, res) => {
     message: 'J4R Box API Running ✅',
     endpoints: {
       products: '/api/products',
-      auth: '/api/auth/register, /api/auth/login'
+      auth: '/api/auth/register, /api/auth/login',
+      seed: '/api/seed',
+      migrate: '/api/migrate',
+      updateStock: '/api/products/:id/stock (POST)'
     }
   });
 });
@@ -99,26 +102,22 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    // Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
     const user = new User({
       name,
       email,
       password: hashedPassword,
-      isAdmin: email === process.env.ADMIN_EMAIL // Auto-admin for admin email
+      isAdmin: email === process.env.ADMIN_EMAIL
     });
 
     await user.save();
 
-    // Generate token
     const token = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET,
@@ -144,19 +143,16 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Generate token
     const token = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET,
@@ -169,7 +165,7 @@ app.post('/api/auth/login', async (req, res) => {
         name: user.name,
         email: user.email,
         isAdmin: user.isAdmin,
-        admin: user.isAdmin // for frontend compatibility
+        admin: user.isAdmin
       },
       token
     });
@@ -214,6 +210,48 @@ app.post('/api/products', authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
+// ✅ NEW: Update Stock Only (NO AUTH REQUIRED - For Checkout)
+app.post('/api/products/:id/stock', async (req, res) => {
+  try {
+    const { stock } = req.body;
+    
+    if (typeof stock !== 'number' || stock < 0) {
+      return res.status(400).json({ error: 'Invalid stock value' });
+    }
+    
+    const product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    
+    // Only update stock for physical products
+    if (product.category === 'physical' && product.stock < 999) {
+      product.stock = stock;
+      await product.save();
+      
+      console.log(`✅ Stock updated: ${product.name} → ${stock}`);
+      
+      res.json({ 
+        success: true, 
+        product: {
+          id: product._id,
+          name: product.name,
+          stock: product.stock
+        }
+      });
+    } else {
+      res.json({ 
+        success: false, 
+        message: 'Stock not updated (not a physical product or unlimited stock)' 
+      });
+    }
+  } catch (error) {
+    console.error('❌ Stock update error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Update Product (Admin Only)
 app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
@@ -248,30 +286,119 @@ app.delete('/api/products/:id', authMiddleware, adminMiddleware, async (req, res
   }
 });
 
-// ===== SEED DATA (One-time setup) =====
-app.get('/api/seed', async (req, res) => {  // ← Changed POST to GET
+// ===== MIGRATION ENDPOINT =====
+app.get('/api/migrate', async (req, res) => {
   try {
-    // Check if products already exist
+    const virtualUpdate = await Product.updateMany(
+      { category: 'virtual' },
+      { $set: { category: 'digital' } }
+    );
+
+    const accessoryUpdate = await Product.updateMany(
+      { category: 'accessory' },
+      { $set: { category: 'physical' } }
+    );
+
+    const currencyUpdate = await Product.updateMany(
+      { category: 'currency' },
+      { $set: { stock: 999 } }
+    );
+
+    const products = await Product.find();
+    
+    res.json({ 
+      message: '✅ Migration complete!',
+      updated: {
+        virtual_to_digital: virtualUpdate.modifiedCount,
+        accessory_to_physical: accessoryUpdate.modifiedCount,
+        currency_stock_fixed: currencyUpdate.modifiedCount
+      },
+      total_products: products.length,
+      products: products
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ===== SEED DATA =====
+app.get('/api/seed', async (req, res) => {
+  try {
     const count = await Product.countDocuments();
     if (count > 0) {
       return res.json({ message: 'Database already seeded', count });
     }
 
-    // Seed products
     const demoProducts = [
-      { name: "Elden Ring (PC)", category: "virtual", price: 2699, stock: 50, image: "./images/elden.jpg", description: "Award-winning ARPG. Steam key." },
-      { name: "God of War Ragnarok (PS5)", category: "physical", price: 3495, stock: 20, image: "./images/god.jpg", description: "Brand new physical disc." },
-      { name: "Genshin Genesis Crystals 6480", category: "currency", price: 4290, stock: 999, image: "./images/genshin.jpg", description: "In-game top up." },
-      { name: "Razer BlackShark V2 X", category: "accessory", price: 2499, stock: 35, image: "./images/razer.png", description: "Lightweight esports headset." },
-      { name: "Minecraft (Java & Bedrock)", category: "virtual", price: 1599, stock: 100, image: "./images/minecraft.jpeg", description: "PC digital code." },
-      { name: "Nintendo Switch Pro Controller", category: "accessory", price: 3495, stock: 15, image: "./images/nintendo.jpeg", description: "Official Pro Controller." },
-      { name: "NBA 2K24 (PS4)", category: "physical", price: 1995, stock: 25, image: "./images/nba.jpeg", description: "PS4 physical disc." },
-      { name: "Valorant Points 475", category: "currency", price: 249, stock: 999, image: "./images/valo.png", description: "Direct Riot top-up." }
+      { 
+        name: "God of War Ragnarok (PS5)", 
+        category: "physical", 
+        price: 3495, 
+        stock: 20, 
+        image: "./images/god.jpg", 
+        description: "Brand new physical disc for PS5." 
+      },
+      { 
+        name: "NBA 2K24 (PS4)", 
+        category: "physical", 
+        price: 1995, 
+        stock: 25, 
+        image: "./images/nba.jpeg", 
+        description: "PS4 physical disc." 
+      },
+      { 
+        name: "Razer BlackShark V2 X", 
+        category: "physical", 
+        price: 2499, 
+        stock: 35, 
+        image: "./images/razer.png", 
+        description: "Lightweight esports headset." 
+      },
+      { 
+        name: "Nintendo Switch Pro Controller", 
+        category: "physical", 
+        price: 3495, 
+        stock: 15, 
+        image: "./images/nintendo.jpeg", 
+        description: "Official Pro Controller." 
+      },
+      { 
+        name: "Genshin Genesis Crystals 6480", 
+        category: "currency", 
+        price: 4290, 
+        stock: 999, 
+        image: "./images/genshin.jpg", 
+        description: "In-game top up. Instant delivery." 
+      },
+      { 
+        name: "Valorant Points 475", 
+        category: "currency", 
+        price: 249, 
+        stock: 999, 
+        image: "./images/valo.png", 
+        description: "Direct Riot top-up." 
+      },
+      { 
+        name: "Elden Ring (PC)", 
+        category: "digital", 
+        price: 2699, 
+        stock: 50, 
+        image: "./images/elden.jpg", 
+        description: "Award-winning ARPG. Steam key." 
+      },
+      { 
+        name: "Minecraft (Java & Bedrock)", 
+        category: "digital", 
+        price: 1599, 
+        stock: 100, 
+        image: "./images/minecraft.jpeg", 
+        description: "PC digital code." 
+      }
     ];
 
     await Product.insertMany(demoProducts);
 
-    res.json({ message: 'Database seeded successfully', count: demoProducts.length });
+    res.json({ message: 'Database seeded successfully ✅', count: demoProducts.length });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -280,4 +407,5 @@ app.get('/api/seed', async (req, res) => {  // ← Changed POST to GET
 // Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📍 Visit http://localhost:${PORT} to test API`);
 });
