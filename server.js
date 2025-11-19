@@ -79,6 +79,20 @@ const adminMiddleware = (req, res, next) => {
   next();
 };
 
+// Add BEFORE your other routes
+app.get('/', (req, res) => {
+  res.status(200).send('Server is running!');
+});
+
+// Or add a dedicated health check
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'active', 
+    timestamp: new Date(),
+    message: 'Server is awake'
+  });
+});
+
 // ============= ROUTES =============
 
 // Health Check
